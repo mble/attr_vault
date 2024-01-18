@@ -2,31 +2,37 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   test:
     strategy:
       fail-fast: false
       matrix:
-        ruby: [2.7]
-        pg: [10, 11, 12, 13]
+        ruby: [3.2.0]
+        pg: [12, 13, 14, 15]
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.ruby == 'debug' }}
 
-    steps:
-    - uses: actions/checkout@v2
-    - uses: ruby/setup-ruby@v1
-      with:
-        bundler-cache: true
-        ruby-version: ${{ matrix.ruby }}
-    - uses: Daniel-Marynicz/postgresql-action@0.1.0
-      with:
-        postgres_image_tag: ${{ matrix.pg }}
-        postgres_db: attr_vault
-        postgres_password: hunter2
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: hunter2
+          POSTGRES_DB: attr_vault
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
-    - run: bundle install
-    - run: DATABASE_URL="postgres://postgres:hunter2@localhost/attr_vault" bundle exec rspec
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: ${{ matrix.ruby }}
+
+      - run: bundle install
+      - run: DATABASE_URL="postgres://postgres:hunter2@localhost/attr_vault" bundle exec rspec
